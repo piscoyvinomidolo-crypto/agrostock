@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AgroStock · Inventario agrícola</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#14532d">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{
+  --g900:#14532d;--g700:#15803d;--g600:#16a34a;--g100:#dcfce7;--g50:#f0fdf4;
+  --bg:#f4f7f4;--card:#fff;--ink:#16221a;--mut:#64748b;--line:#e2e8e2;
+  --warn:#d97706;--warnbg:#fef3c7;--bad:#dc2626;--badbg:#fee2e2;--ok:#15803d;--okbg:#dcfce7;
+  --r:14px;--sh:0 1px 2px rgba(16,40,24,.06),0 4px 14px rgba(16,40,24,.06);
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.4;padding-bottom:84px}
+header{background:linear-gradient(120deg,var(--g900),var(--g700));color:#fff;padding:14px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:20}
+header h1{font-size:19px;letter-spacing:.2px;flex:1}
+header h1 small{display:block;font-weight:400;font-size:12px;opacity:.8}
+.pill{font-size:12px;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,.18);white-space:nowrap}
+.pill.demo{background:#fbbf24;color:#422006}
+.ibtn{background:rgba(255,255,255,.16);border:0;color:#fff;border-radius:10px;padding:8px 11px;font-size:16px;cursor:pointer}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;z-index:30;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;padding:9px 2px 8px;font-size:11px;color:var(--mut);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button span{font-size:19px}
+nav button.on{color:var(--g700);font-weight:600}
+main{max-width:1180px;margin:0 auto;padding:16px}
+section{display:none}section.on{display:block}
+.grid{display:grid;gap:14px}
+.kpis{grid-template-columns:repeat(2,1fr)}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:16px}
+.card h2{font-size:15px;margin-bottom:10px}
+.chead{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.chead h2{margin:0}
+.chead .acts{display:flex;gap:6px;flex-wrap:wrap}
+.kpi .v{font-size:26px;font-weight:700;color:var(--g900)}
+.kpi .l{font-size:12px;color:var(--mut)}
+.kpi.warn .v{color:var(--warn)}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.filters label{flex:1;min-width:130px}
+label{display:block;font-size:12px;color:var(--mut);font-weight:600}
+input,select,textarea{width:100%;margin-top:4px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--g600);border-color:transparent}
+textarea{resize:vertical;min-height:70px}
+.btn{background:var(--g700);color:#fff;border:0;border-radius:10px;padding:12px 18px;font:inherit;font-weight:600;cursor:pointer}
+.btn:disabled{opacity:.6}
+.btn.sec{background:var(--g100);color:var(--g900)}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:8px}
+.btn.red{background:var(--badbg);color:var(--bad)}
+.form{display:grid;gap:12px;grid-template-columns:1fr}
+.seg{display:flex;gap:8px}
+.seg button{flex:1;padding:12px;border:2px solid var(--line);background:#fff;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;color:var(--mut)}
+.seg button.on.out{border-color:var(--bad);background:var(--badbg);color:var(--bad)}
+.seg button.on.in{border-color:var(--g600);background:var(--okbg);color:var(--g900)}
+.charts{grid-template-columns:1fr}
+.cbox{position:relative;height:280px}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:12px;color:var(--mut);text-align:left;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;white-space:nowrap}
+.b-ok{background:var(--okbg);color:var(--ok)}.b-bajo{background:var(--warnbg);color:var(--warn)}.b-agotado{background:var(--badbg);color:var(--bad)}
+.b-sal{background:var(--badbg);color:var(--bad)}.b-ent{background:var(--okbg);color:var(--ok)}
+.bar{height:7px;background:#e5ece5;border-radius:9px;min-width:70px;margin-top:5px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--g600)}
+.bar.bajo i{background:var(--warn)}.bar.agotado i{background:var(--bad)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:99px;padding:7px 14px;font-size:13px;white-space:nowrap;cursor:pointer;color:var(--ink)}
+.chip.on{background:var(--g700);color:#fff;border-color:var(--g700)}
+.preview{padding:12px;border-radius:10px;background:var(--g50);font-size:14px;border:1px dashed var(--g600)}
+.preview.err{background:var(--badbg);border-color:var(--bad);color:var(--bad)}
+.empty{text-align:center;color:var(--mut);padding:26px 10px}
+.mut{color:var(--mut);font-size:13px}
+.hide{display:none!important}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;background:#16221a;color:#fff;padding:12px 18px;border-radius:12px;z-index:60;max-width:90vw;box-shadow:var(--sh);opacity:0;pointer-events:none;transition:opacity .25s}
+#toast.show{opacity:1}#toast.err{background:var(--bad)}
+dialog{border:0;border-radius:var(--r);padding:20px;width:min(520px,94vw);box-shadow:0 10px 40px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog ol{padding-left:20px;margin:10px 0;font-size:13px;color:var(--mut)}
+.row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+@media(min-width:760px){
+  body{padding-bottom:0}
+  nav{position:static;border:0;background:#fff;box-shadow:var(--sh);justify-content:center;padding:0}
+  nav button{flex:0 0 auto;flex-direction:row;font-size:14px;padding:14px 22px;gap:8px}
+  nav button.on{box-shadow:inset 0 -3px 0 var(--g700)}
+  .kpis{grid-template-columns:repeat(4,1fr)}
+  .charts{grid-template-columns:2fr 1fr}
+  .charts .wide{grid-column:1/-1}
+  .form{grid-template-columns:1fr 1fr}.form .full{grid-column:1/-1}
+  #toast{bottom:30px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>🌱 AgroStock<small>Inventario de insumos agrícolas</small></h1>
+  <span class="pill" id="status">…</span>
+  <button class="ibtn" id="btnSync" title="Sincronizar">⟳</button>
+  <button class="ibtn" id="btnCfg" title="Configuración">⚙</button>
+</header>
+
+<nav id="nav">
+  <button data-tab="dash" class="on"><span>📊</span>Dashboard</button>
+  <button data-tab="inv"><span>📦</span>Inventario</button>
+  <button data-tab="uso"><span>🧪</span>Registrar uso</button>
+  <button data-tab="hist"><span>🗓️</span>Movimientos</button>
+  <button data-tab="nuevo"><span>➕</span>Nuevo</button>
+</nav>
+
+<main>
+<!-- DASHBOARD -->
+<section id="tab-dash" class="on">
+  <div class="grid kpis" style="margin-bottom:14px">
+    <div class="card kpi"><div class="v" id="k1">0</div><div class="l">Productos registrados</div></div>
+    <div class="card kpi warn"><div class="v" id="k2">0</div><div class="l">Con stock bajo o agotado</div></div>
+    <div class="card kpi"><div class="v" id="k3">0</div><div class="l">Salidas en el período</div></div>
+    <div class="card kpi"><div class="v" id="k4" style="font-size:17px">—</div><div class="l">Última salida</div></div>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="filters" style="margin:0">
+      <label>Período<select id="dPer"><option value="7">Últimos 7 días</option><option value="30" selected>Últimos 30 días</option><option value="90">Últimos 90 días</option><option value="all">Todo</option></select></label>
+      <label>Categoría<select id="dCat"></select></label>
+      <label>Producto<select id="dProd"></select></label>
+    </div>
+  </div>
+  <div class="grid charts">
+    <div class="card wide"><h2>Uso por día <span class="mut">(cada color es un producto; toca la barra para ver el detalle)</span></h2><div class="cbox"><canvas id="chDay"></canvas></div></div>
+    <div class="card"><h2>Stock actual por producto</h2><div class="cbox"><canvas id="chStock"></canvas></div></div>
+    <div class="card"><h2>Aplicaciones por categoría</h2><div class="cbox"><canvas id="chCat"></canvas></div></div>
+    <div class="card"><h2>⚠️ Alertas de stock</h2><div class="tw" id="alerts"></div></div>
+    <div class="card">
+      <div class="chead">
+        <h2>Últimos movimientos</h2>
+        <div class="acts">
+          <button class="btn sm" id="dOpen">📄 Abrir hoja</button>
+          <button class="btn sm sec" id="dXlsx">Excel</button>
+          <button class="btn sm sec" id="dPdf">PDF</button>
+        </div>
+      </div>
+      <div class="tw" id="lastMov"></div>
+    </div>
+  </div>
+</section>
+
+<!-- INVENTARIO -->
+<section id="tab-inv">
+  <div class="card">
+    <div class="row" style="margin:0 0 12px"><button class="btn sec sm" id="iCsv">⬇ Exportar todo el inventario (CSV)</button></div>
+    <label>Buscar producto<input id="iQ" type="search" placeholder="Nombre…"></label>
+    <div class="chips" id="iChips" style="margin-top:12px"></div>
+    <div class="tw" id="invTable"></div>
+  </div>
+</section>
+
+<!-- REGISTRAR USO -->
+<section id="tab-uso">
+  <div class="card">
+    <h2>Registrar movimiento</h2>
+    <form id="fMov" class="form">
+      <div class="full seg">
+        <button type="button" class="on out" data-tipo="Salida">⬇ Salida (uso)</button>
+        <button type="button" data-tipo="Entrada" class="in">⬆ Entrada (compra)</button>
+      </div>
+      <label>Fecha<input type="date" id="rFecha" required></label>
+      <label>Categoría<select id="rCat"></select></label>
+      <label class="full">Producto<select id="rProd" required></select></label>
+      <label>Cantidad <span id="rUni" class="mut"></span><input type="number" id="rCant" step="0.001" min="0.001" inputmode="decimal" required></label>
+      <label class="fSal">Lote / cultivo / parcela<input id="rLote" placeholder="Ej. Lote 3 – Palto"></label>
+      <label class="fSal">Responsable<input id="rResp" list="dlResp" placeholder="Quién aplicó"><datalist id="dlResp"></datalist></label>
+      <label class="full">Observaciones<textarea id="rObs" placeholder="Dosis, clima, notas…"></textarea></label>
+      <div class="full preview" id="rPrev">Elige un producto y la cantidad.</div>
+      <div class="full"><button class="btn" id="rBtn" style="width:100%">Registrar salida</button></div>
+    </form>
+  </div>
+</section>
+
+<!-- MOVIMIENTOS (hoja aparte) -->
+<section id="tab-hist">
+  <div class="card">
+    <div class="chead"><h2>🗓️ Hoja de movimientos</h2></div>
+    <div class="filters">
+      <label>Desde<input type="date" id="hDe"></label>
+      <label>Hasta<input type="date" id="hA"></label>
+      <label>Categoría<select id="hCat"></select></label>
+      <label>Producto<select id="hProd"></select></label>
+      <label>Tipo<select id="hTipo"><option value="">Todos</option><option>Salida</option><option>Entrada</option></select></label>
+    </div>
+    <div class="row" style="margin:0 0 12px">
+      <button class="btn sec sm" id="hXlsx">⬇ Excel (.xlsx)</button>
+      <button class="btn sec sm" id="hPdf">⬇ PDF</button>
+      <button class="btn sec sm" id="hCsv">⬇ CSV</button>
+      <span class="mut" id="hCount" style="align-self:center"></span>
+    </div>
+    <div class="tw" id="histTable"></div>
+  </div>
+</section>
+
+<!-- NUEVO PRODUCTO -->
+<section id="tab-nuevo">
+  <div class="grid" style="gap:14px">
+  <div class="card">
+    <h2>Nuevo producto</h2>
+    <form id="fProd" class="form">
+      <label class="full">Nombre del producto<input id="pNom" required placeholder="Ej. Urea 46%"></label>
+      <label>Categoría<select id="pCat"></select></label>
+      <label id="pNewWrap" class="hide">Nombre de la nueva categoría<input id="pNew" placeholder="Ej. Herbicidas"></label>
+      <label>Unidad<select id="pUni"><option value="L">Litros (L)</option><option value="kg">Kilos (kg)</option></select></label>
+      <label>Stock inicial<input type="number" id="pStock" step="0.001" min="0" value="0" inputmode="decimal"></label>
+      <label>Stock mínimo (alerta)<input type="number" id="pMin" step="0.001" min="0" value="0" inputmode="decimal"></label>
+      <label>Proveedor<input id="pProv"></label>
+      <label class="full">Notas<textarea id="pNotas"></textarea></label>
+      <div class="full"><button class="btn" id="pBtn" style="width:100%">Guardar producto</button></div>
+    </form>
+    <p class="mut" style="margin-top:10px">Cada categoría tiene su propia hoja en Google Sheets; si creas una categoría nueva, la hoja se crea sola.</p>
+  </div>
+  <div class="card"><h2>Categorías</h2>
+    <form id="fCat" class="row" style="margin:0 0 12px"><input id="cNom" placeholder="Nueva categoría (ej. Herbicidas)" style="flex:1;min-width:180px;margin:0" required><button class="btn">＋ Crear categoría</button></form>
+    <div id="catList"></div></div>
+  </div>
+</section>
+</main>
+
+<dialog id="dlgCfg">
+  <h2 style="margin-bottom:6px">Conexión con Google Sheets</h2>
+  <label>URL de la aplicación web (Apps Script, termina en /exec)<input id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec"></label>
+  <ol>
+    <li>Crea una hoja nueva en Google Sheets.</li>
+    <li>Extensiones › Apps Script: pega el archivo <b>Code.gs</b> y ejecuta <b>configurarHojas</b>.</li>
+    <li>Implementar › Aplicación web › acceso: <b>Cualquier persona</b>.</li>
+    <li>Pega aquí la URL y guarda.</li>
+  </ol>
+  <p class="mut">Sin URL, la app funciona en <b>modo demo</b>: los datos se guardan solo en este navegador.</p>
+  <div class="row">
+    <button class="btn" id="cfgSave">Guardar</button>
+    <button class="btn sec" id="cfgDemo">Cargar datos de ejemplo (demo)</button>
+    <button class="btn sec" id="cfgClose">Cerrar</button>
+  </div>
+</dialog>
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   CONFIGURACIÓN: URL de tu Apps Script (termina en /exec)
+   ============================================================ */
+const API_URL='https://script.google.com/macros/s/AKfycbxKf3UQXnnkWXRBXYQ2Be8ggKW2xK7oou8P0ChkcH8b4W1HG0hwg95lfKroa6YAdv3DLQ/exec';
+
+/* ===== Utilidades ===== */
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const r3=x=>Math.round(Number(x)*1000)/1000;
+const fmt=n=>Number(n).toLocaleString('es-PE',{maximumFractionDigits:3});
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const today=()=>ymd(new Date());
+const dm=f=>{const p=String(f).split('-');return p.length===3?`${p[2]}/${p[1]}`:f};
+const dmy=f=>{const p=String(f).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:f};
+const estado=p=>p.stockActual<=0?'agotado':(p.stockActual<=p.stockMin?'bajo':'ok');
+const ESTL={ok:'OK',bajo:'Stock bajo',agotado:'Agotado'};
+const byRecent=(a,b)=>(b.fecha+(b.hora||'')).localeCompare(a.fecha+(a.hora||''));
+let toastT;
+function toast(msg,err){const t=$('#toast');t.textContent=msg;t.className='show'+(err?' err':'');clearTimeout(toastT);toastT=setTimeout(()=>t.className='',3600)}
+
+/* ===== Datos / backend ===== */
+const LS_DATA='agrostock_local',LS_URL='agrostock_url';
+const CATS0=['Fertilizantes','Pesticidas','Fungicidas','Enmiendas','Foliares','Enraizantes','Otros'];
+const RESERV=['productos','movimientos','categorias'];
+let S={productos:[],movimientos:[],categorias:[]};
+const API_OK=/^https:\/\/script\.google\.com\/.+\/exec/.test(API_URL);
+let URL_=API_OK?API_URL:(localStorage.getItem(LS_URL)||'');
+
+const local={
+  get(){let d=null;try{d=JSON.parse(localStorage.getItem(LS_DATA))}catch(e){}
+    if(!d){d={productos:[],movimientos:[],categorias:CATS0.slice()};this.save(d)}return d},
+  save(d){try{localStorage.setItem(LS_DATA,JSON.stringify(d))}catch(e){}},
+  post(b){
+    const d=this.get();
+    const nid=(p,arr)=>p+'-'+String(arr.reduce((m,x)=>Math.max(m,parseInt(String(x.id).split('-')[1])||0),0)+1).padStart(4,'0');
+    const addCat=n=>{if(!d.categorias.some(c=>c.toLowerCase()===n.toLowerCase()))d.categorias.push(n)};
+    if(b.action==='addCategory'){
+      const n=String(b.nombre||'').trim();
+      if(!n)throw new Error('Escribe el nombre de la categoría.');
+      if(RESERV.includes(n.toLowerCase()))throw new Error('Ese nombre está reservado.');
+      if(d.categorias.some(c=>c.toLowerCase()===n.toLowerCase()))throw new Error('La categoría ya existe.');
+      d.categorias.push(n);
+    }else if(b.action==='addProduct'){
+      const n=String(b.nombre||'').trim(),c=String(b.categoria||'').trim();
+      if(!n)throw new Error('Falta el nombre del producto.');if(!c)throw new Error('Falta la categoría.');
+      if(RESERV.includes(c.toLowerCase()))throw new Error('Nombre de categoría reservado.');
+      if(d.productos.some(p=>p.nombre.toLowerCase()===n.toLowerCase()&&p.categoria===c))throw new Error('Ya existe ese producto en la categoría.');
+      addCat(c);const st=r3(b.stockInicial||0);
+      d.productos.push({id:nid('P',d.productos),nombre:n,categoria:c,unidad:b.unidad==='kg'?'kg':'L',stockInicial:st,stockActual:st,stockMin:r3(b.stockMin||0),proveedor:b.proveedor||'',notas:b.notas||'',creado:today()});
+    }else if(b.action==='updateProduct'){
+      const p=d.productos.find(x=>x.id===b.id);if(!p)throw new Error('Producto no encontrado.');
+      if(b.stockMin!==undefined)p.stockMin=r3(b.stockMin);
+    }else if(b.action==='addMovement'){
+      const p=d.productos.find(x=>x.id===b.idProducto);if(!p)throw new Error('Producto no encontrado.');
+      const q=r3(b.cantidad),tipo=b.tipo==='Entrada'?'Entrada':'Salida';
+      if(!(q>0))throw new Error('La cantidad debe ser mayor a 0.');
+      if(tipo==='Salida'&&q>p.stockActual+1e-9)throw new Error(`Stock insuficiente: solo quedan ${fmt(p.stockActual)} ${p.unidad} de ${p.nombre}.`);
+      p.stockActual=r3(tipo==='Salida'?p.stockActual-q:p.stockActual+q);
+      const n=new Date();
+      d.movimientos.push({id:nid('M',d.movimientos),fecha:b.fecha||today(),hora:`${pad(n.getHours())}:${pad(n.getMinutes())}`,idProducto:p.id,producto:p.nombre,categoria:p.categoria,tipo,cantidad:q,unidad:p.unidad,lote:b.lote||'',responsable:b.responsable||'',observaciones:b.observaciones||'',stockResultante:p.stockActual});
+    }else if(b.action==='deleteMovement'){
+      const i=d.movimientos.findIndex(x=>x.id===b.id);if(i<0)throw new Error('Movimiento no encontrado.');
+      const m=d.movimientos[i],p=d.productos.find(x=>x.id===m.idProducto);
+      if(p){const nv=r3(m.tipo==='Salida'?p.stockActual+m.cantidad:p.stockActual-m.cantidad);
+        if(nv<0)throw new Error('No se puede anular: el stock quedaría negativo.');p.stockActual=nv}
+      d.movimientos.splice(i,1);
+    }else throw new Error('Acción desconocida.');
+    this.save(d);return d;
+  }
+};
+async function apiGet(){
+  if(!URL_)return local.get();
+  const r=await fetch(URL_+'?action=getAll');const j=await r.json();
+  if(!j.ok)throw new Error(j.error);return j.data;
+}
+async function apiPost(body){
+  if(!URL_)return local.post(body);
+  const r=await fetch(URL_,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)});
+  const j=await r.json();if(!j.ok)throw new Error(j.error);return j.data;
+}
+async function load(){
+  try{S=await apiGet();render()}catch(e){toast('No se pudo leer Google Sheets: '+e.message,true)}
+  const st=$('#status');st.textContent=URL_?'● Google Sheets':'Modo demo (local)';st.className='pill'+(URL_?'':' demo');
+}
+async function act(body,okMsg,btn){
+  if(btn)btn.disabled=true;
+  try{S=await apiPost(body);render();if(okMsg)toast(typeof okMsg==='function'?okMsg():okMsg);return true}
+  catch(e){toast(e.message,true);return false}
+  finally{if(btn)btn.disabled=false}
+}
+
+/* ===== Helpers de UI ===== */
+function setOpts(sel,opts,keep=true){
+  const cur=sel.value;sel.innerHTML=opts.map(o=>`<option value="${esc(o.v)}">${esc(o.t)}</option>`).join('');
+  if(keep&&opts.some(o=>o.v===cur))sel.value=cur;
+}
+const catOpts=(all)=>[...(all?[{v:'',t:'Todas'}]:[]),...S.categorias.map(c=>({v:c,t:c}))];
+const prodOpts=(cat,all,stock)=>[...(all?[{v:'',t:'Todos'}]:[]),...S.productos.filter(p=>!cat||p.categoria===cat).map(p=>({v:p.id,t:stock?`${p.nombre} — ${fmt(p.stockActual)} ${p.unidad}`:p.nombre}))];
+const badge=e=>`<span class="badge b-${e}">${ESTL[e]}</span>`;
+const empty=t=>`<div class="empty">${t}</div>`;
+
+/* ===== Render ===== */
+let charts={};
+function render(){
+  setOpts($('#dCat'),catOpts(true));setOpts($('#dProd'),prodOpts($('#dCat').value,true));
+  setOpts($('#rCat'),catOpts(true));setOpts($('#rProd'),prodOpts($('#rCat').value,false,true));
+  setOpts($('#hCat'),catOpts(true));setOpts($('#hProd'),prodOpts($('#hCat').value,true));
+  setOpts($('#pCat'),[...catOpts(false),{v:'__new__',t:'＋ Nueva categoría…'}]);
+  $('#dlResp').innerHTML=[...new Set(S.movimientos.map(m=>m.responsable).filter(Boolean))].map(r=>`<option value="${esc(r)}">`).join('');
+  renderDash();renderInv();renderHist();renderCats();preview();
+}
+
+function renderDash(){
+  const cat=$('#dCat').value,per=$('#dPer').value,pid=$('#dProd').value;
+  let start='0000-00-00';
+  if(per!=='all'){const d=new Date();d.setDate(d.getDate()-(+per-1));start=ymd(d)}
+  const prods=S.productos.filter(p=>!cat||p.categoria===cat);
+  const sal=S.movimientos.filter(m=>m.tipo==='Salida'&&m.fecha>=start&&(!cat||m.categoria===cat)&&(!pid||m.idProducto===pid));
+  $('#k1').textContent=S.productos.length;
+  $('#k2').textContent=S.productos.filter(p=>estado(p)!=='ok').length;
+  $('#k3').textContent=sal.length;
+  const last=[...S.movimientos].filter(m=>m.tipo==='Salida').sort(byRecent)[0];
+  $('#k4').textContent=last?`${last.producto} · ${dm(last.fecha)}`:'—';
+
+  // Uso por día
+  let days=[];
+  if(per==='all'){days=[...new Set(sal.map(m=>m.fecha))].sort()}
+  else{const d=new Date();for(let i=+per-1;i>=0;i--){const x=new Date();x.setDate(d.getDate()-i);days.push(ymd(x))}}
+  const pal=['#16a34a','#0ea5e9','#d97706','#8b5cf6','#ec4899','#14b8a6','#64748b','#f59e0b','#ef4444','#84cc16','#6366f1','#f97316'];
+  const ids=[...new Set(sal.map(m=>m.idProducto))];
+  const ds=ids.map((id,i)=>{const m0=sal.find(m=>m.idProducto===id);
+    return {label:`${m0.producto} (${m0.unidad})`,unit:m0.unidad,backgroundColor:pal[i%pal.length],borderRadius:3,
+      data:days.map(f=>r3(sal.filter(m=>m.fecha===f&&m.idProducto===id).reduce((a,m)=>a+Number(m.cantidad),0)))}});
+  draw('chDay',{type:'bar',data:{labels:days.map(dm),datasets:ds},options:{responsive:true,maintainAspectRatio:false,
+    scales:{y:{stacked:true,beginAtZero:true,title:{display:true,text:'Cantidad (L / kg)'}},x:{stacked:true,ticks:{maxRotation:60,autoSkip:true}}},
+    plugins:{legend:{position:'bottom'},tooltip:{filter:i=>i.parsed.y>0,callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.parsed.y)} ${c.dataset.unit}`}}}}});
+
+  // Stock por producto
+  const top=[...prods].sort((a,b)=>b.stockActual-a.stockActual).slice(0,12);
+  const col={ok:'#16a34a',bajo:'#d97706',agotado:'#dc2626'};
+  draw('chStock',{type:'bar',data:{labels:top.map(p=>`${p.nombre} (${p.unidad})`),datasets:[{data:top.map(p=>p.stockActual),backgroundColor:top.map(p=>col[estado(p)]),borderRadius:5}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}});
+
+  // Aplicaciones por categoría
+  const cnt={};sal.forEach(m=>cnt[m.categoria]=(cnt[m.categoria]||0)+1);
+  const keys=Object.keys(cnt);
+  draw('chCat',{type:'doughnut',data:{labels:keys,datasets:[{data:keys.map(x=>cnt[x]),backgroundColor:['#16a34a','#0ea5e9','#d97706','#8b5cf6','#ec4899','#14b8a6','#64748b','#f59e0b']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+
+  // Alertas
+  const al=prods.filter(p=>estado(p)!=='ok').sort((a,b)=>a.stockActual-b.stockActual);
+  $('#alerts').innerHTML=al.length?`<table><tr><th>Producto</th><th>Stock</th><th></th></tr>${al.map(p=>`<tr><td>${esc(p.nombre)}<div class="mut">${esc(p.categoria)}</div></td><td>${fmt(p.stockActual)} ${p.unidad}</td><td>${badge(estado(p))}</td></tr>`).join('')}</table>`:empty('Todo el stock está en niveles normales ✔');
+  // Últimos movimientos
+  const lm=[...S.movimientos].sort(byRecent).slice(0,8);
+  $('#lastMov').innerHTML=lm.length?`<table><tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Quedan</th></tr>${lm.map(m=>`<tr><td>${dm(m.fecha)}</td><td>${esc(m.producto)}</td><td><span class="badge ${m.tipo==='Salida'?'b-sal':'b-ent'}">${m.tipo==='Salida'?'−':'+'}${fmt(m.cantidad)} ${m.unidad}</span></td><td>${fmt(m.stockResultante)}</td></tr>`).join('')}</table>`:empty('Aún no hay movimientos.');
+}
+function draw(id,cfg){
+  if(typeof Chart==='undefined')return;
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart($('#'+id),cfg);
+}
+
+let invCat='';
+function renderInv(){
+  $('#iChips').innerHTML=['',...S.categorias].map(c=>`<button class="chip ${c===invCat?'on':''}" data-c="${esc(c)}">${c?esc(c):'Todas'}</button>`).join('');
+  const q=$('#iQ').value.trim().toLowerCase();
+  const list=S.productos.filter(p=>(!invCat||p.categoria===invCat)&&(!q||p.nombre.toLowerCase().includes(q)));
+  $('#invTable').innerHTML=list.length?`<table><tr><th>Producto</th><th>Stock actual</th><th>Mínimo</th><th>Estado</th><th></th></tr>${list.map(p=>{
+    const e=estado(p),cap=Math.max(p.stockInicial,p.stockActual,p.stockMin*2,0.001),w=Math.min(100,p.stockActual/cap*100);
+    return `<tr><td><b>${esc(p.nombre)}</b><div class="mut">${esc(p.categoria)}${p.proveedor?' · '+esc(p.proveedor):''}</div></td>
+    <td style="min-width:120px"><b>${fmt(p.stockActual)} ${p.unidad}</b><div class="bar ${e}"><i style="width:${w}%"></i></div></td>
+    <td>${fmt(p.stockMin)} ${p.unidad}</td><td>${badge(e)}</td>
+    <td style="white-space:nowrap"><button class="btn sm" data-use="${p.id}">Usar</button> <button class="btn sm sec" data-min="${p.id}">Mín.</button></td></tr>`}).join('')}</table>`:empty('No hay productos. Agrégalos en la pestaña “Nuevo”.');
+}
+
+function filteredHist(){
+  const de=$('#hDe').value,a=$('#hA').value,c=$('#hCat').value,p=$('#hProd').value,t=$('#hTipo').value;
+  return S.movimientos.filter(m=>(!de||m.fecha>=de)&&(!a||m.fecha<=a)&&(!c||m.categoria===c)&&(!p||m.idProducto===p)&&(!t||m.tipo===t)).sort(byRecent);
+}
+function renderHist(){
+  const list=filteredHist();$('#hCount').textContent=`${list.length} registros`;
+  $('#histTable').innerHTML=list.length?`<table><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Cantidad</th><th>Quedan</th><th>Lote</th><th>Responsable</th><th>Obs.</th><th></th></tr>${list.map(m=>`<tr><td>${dmy(m.fecha)}<div class="mut">${esc(m.hora)}</div></td><td>${esc(m.producto)}<div class="mut">${esc(m.categoria)}</div></td><td><span class="badge ${m.tipo==='Salida'?'b-sal':'b-ent'}">${m.tipo}</span></td><td>${fmt(m.cantidad)} ${m.unidad}</td><td>${fmt(m.stockResultante)} ${m.unidad}</td><td>${esc(m.lote)}</td><td>${esc(m.responsable)}</td><td>${esc(m.observaciones)}</td><td><button class="btn sm red" data-del="${m.id}">Anular</button></td></tr>`).join('')}</table>`:empty('Sin movimientos para estos filtros.');
+}
+function renderCats(){
+  $('#catList').innerHTML=S.categorias.map(c=>{const n=S.productos.filter(p=>p.categoria===c).length;return `<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line)"><span>📁 ${esc(c)}</span><span class="mut">${n} producto${n===1?'':'s'}</span></div>`}).join('');
+}
+
+/* ===== Registrar uso ===== */
+let tipo='Salida';
+function selProd(){return S.productos.find(p=>p.id===$('#rProd').value)}
+function preview(){
+  const p=selProd(),q=parseFloat($('#rCant').value),box=$('#rPrev');
+  $('#rUni').textContent=p?`(${p.unidad})`:'';
+  if(!p){box.className='full preview';box.textContent='Elige un producto y la cantidad.';return}
+  if(!(q>0)){box.className='full preview';box.innerHTML=`Stock actual: <b>${fmt(p.stockActual)} ${p.unidad}</b>`;return}
+  const nv=r3(tipo==='Salida'?p.stockActual-q:p.stockActual+q);
+  if(nv<0){box.className='full preview err';box.innerHTML=`⚠ Stock insuficiente. Solo hay <b>${fmt(p.stockActual)} ${p.unidad}</b>.`;return}
+  box.className='full preview';box.innerHTML=`Stock actual: <b>${fmt(p.stockActual)} ${p.unidad}</b> → quedará: <b>${fmt(nv)} ${p.unidad}</b>`;
+}
+function setTipo(t){
+  tipo=t;$$('.seg button').forEach(b=>b.classList.toggle('on',b.dataset.tipo===t));
+  $$('.fSal').forEach(e=>e.classList.toggle('hide',t==='Entrada'));
+  $('#rBtn').textContent=t==='Salida'?'Registrar salida':'Registrar entrada';preview();
+}
+
+/* ===== Exportar movimientos (Excel / PDF / CSV) ===== */
+const MOV_HEAD=['Fecha','Hora','Producto','Categoría','Tipo','Cantidad','Unidad','Lote','Responsable','Observaciones','Stock resultante'];
+const movRows=rows=>rows.map(m=>[dmy(m.fecha),m.hora||'',m.producto,m.categoria,m.tipo,Number(m.cantidad),m.unidad,m.lote||'',m.responsable||'',m.observaciones||'',Number(m.stockResultante)]);
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
+
+function exportXlsx(rows){
+  if(!rows.length)return toast('No hay datos para exportar.',true);
+  const body=movRows(rows);
+  if(typeof XLSX!=='undefined'){
+    const ws=XLSX.utils.aoa_to_sheet([MOV_HEAD,...body]);
+    ws['!cols']=[11,7,24,14,9,10,7,18,14,28,14].map(w=>({wch:w}));
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Movimientos');
+    XLSX.writeFile(wb,`movimientos_${today()}.xlsx`);
+  }else{
+    const t=`<html><head><meta charset="utf-8"></head><body><table border="1"><tr>${MOV_HEAD.map(h=>`<th>${esc(h)}</th>`).join('')}</tr>${body.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table></body></html>`;
+    download(new Blob(['\ufeff'+t],{type:'application/vnd.ms-excel'}),`movimientos_${today()}.xls`);
+  }
+  toast('Excel generado ✔');
+}
+function exportPdf(rows,subtitle){
+  if(!rows.length)return toast('No hay datos para exportar.',true);
+  const body=movRows(rows).map(r=>r.map(c=>typeof c==='number'?fmt(c):c));
+  const J=window.jspdf&&window.jspdf.jsPDF;
+  if(J){
+    const doc=new J({orientation:'landscape',unit:'mm',format:'a4'});
+    doc.setFontSize(15);doc.text('AgroStock · Movimientos de inventario',14,15);
+    doc.setFontSize(9);doc.setTextColor(100);
+    doc.text(`${subtitle||'Todos los movimientos'} · ${rows.length} registros · Generado ${dmy(today())}`,14,21);
+    if(typeof doc.autoTable==='function'){
+      doc.autoTable({head:[MOV_HEAD],body,startY:25,styles:{fontSize:7.5,cellPadding:1.8},headStyles:{fillColor:[21,128,61]},alternateRowStyles:{fillColor:[240,253,244]}});
+    }
+    doc.save(`movimientos_${today()}.pdf`);
+    toast('PDF generado ✔');
+  }else{
+    const w=window.open('','_blank');
+    if(!w)return toast('Permite ventanas emergentes para generar el PDF.',true);
+    w.document.write(`<html><head><meta charset="utf-8"><title>Movimientos</title><style>body{font-family:sans-serif;font-size:11px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:4px 6px;text-align:left}th{background:#15803d;color:#fff}</style></head><body><h2>AgroStock · Movimientos</h2><table><tr>${MOV_HEAD.map(h=>`<th>${esc(h)}</th>`).join('')}</tr>${body.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table></body></html>`);
+    w.document.close();w.focus();setTimeout(()=>w.print(),400);
+  }
+}
+function histSubtitle(){
+  const p=[];const de=$('#hDe').value,a=$('#hA').value,c=$('#hCat').value,pr=$('#hProd').value,t=$('#hTipo').value;
+  if(de)p.push('desde '+dmy(de));if(a)p.push('hasta '+dmy(a));if(c)p.push(c);
+  if(pr){const x=S.productos.find(z=>z.id===pr);if(x)p.push(x.nombre)}if(t)p.push(t+'s');
+  return p.length?'Filtros: '+p.join(' · '):'Todos los movimientos';
+}
+const allMov=()=>[...S.movimientos].sort(byRecent);
+
+/* ===== Eventos ===== */
+$('#nav').onclick=e=>{const b=e.target.closest('button');if(b)showTab(b.dataset.tab)};
+function showTab(t){
+  $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+  $$('section').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));
+  if(t==='dash')renderDash();window.scrollTo(0,0);
+}
+['dPer','dCat','dProd'].forEach(id=>$('#'+id).onchange=()=>{if(id==='dCat')setOpts($('#dProd'),prodOpts($('#dCat').value,true),false);renderDash()});
+$('#dOpen').onclick=()=>showTab('hist');
+$('#dXlsx').onclick=()=>exportXlsx(allMov());
+$('#dPdf').onclick=()=>exportPdf(allMov(),'Todos los movimientos');
+$('#iQ').oninput=renderInv;
+$('#iChips').onclick=e=>{const b=e.target.closest('.chip');if(b){invCat=b.dataset.c;renderInv()}};
+$('#invTable').onclick=async e=>{
+  const u=e.target.closest('[data-use]'),m=e.target.closest('[data-min]');
+  if(u){showTab('uso');$('#rCat').value='';setOpts($('#rProd'),prodOpts('',false,true),false);$('#rProd').value=u.dataset.use;setTipo('Salida');preview();$('#rCant').focus()}
+  if(m){const p=S.productos.find(x=>x.id===m.dataset.min);const v=prompt(`Stock mínimo de ${p.nombre} (${p.unidad}):`,p.stockMin);
+    if(v!==null&&v.trim()!==''&&!isNaN(v))await act({action:'updateProduct',id:p.id,stockMin:parseFloat(v)},'Stock mínimo actualizado')}
+};
+$('.seg').onclick=e=>{const b=e.target.closest('button');if(b)setTipo(b.dataset.tipo)};
+$('#rCat').onchange=()=>{setOpts($('#rProd'),prodOpts($('#rCat').value,false,true),false);preview()};
+$('#rProd').onchange=preview;$('#rCant').oninput=preview;
+$('#fMov').onsubmit=async e=>{
+  e.preventDefault();const p=selProd();if(!p)return toast('Elige un producto.',true);
+  const q=parseFloat($('#rCant').value);
+  const ok=await act({action:'addMovement',idProducto:p.id,tipo,cantidad:q,fecha:$('#rFecha').value||today(),lote:tipo==='Salida'?$('#rLote').value.trim():'',responsable:tipo==='Salida'?$('#rResp').value.trim():'',observaciones:$('#rObs').value.trim()},
+    ()=>{const n=S.productos.find(x=>x.id===p.id);return `${tipo} registrada. Quedan ${fmt(n.stockActual)} ${n.unidad} de ${n.nombre}.`},$('#rBtn'));
+  if(ok){$('#rCant').value='';$('#rObs').value='';preview()}
+};
+['hDe','hA','hCat','hProd','hTipo'].forEach(id=>$('#'+id).onchange=()=>{if(id==='hCat')setOpts($('#hProd'),prodOpts($('#hCat').value,true),false);renderHist()});
+$('#histTable').onclick=async e=>{
+  const d=e.target.closest('[data-del]');if(!d)return;
+  if(confirm('¿Anular este movimiento? El stock se corregirá automáticamente.'))await act({action:'deleteMovement',id:d.dataset.del},'Movimiento anulado');
+};
+$('#hXlsx').onclick=()=>exportXlsx(filteredHist());
+$('#hPdf').onclick=()=>exportPdf(filteredHist(),histSubtitle());
+$('#hCsv').onclick=()=>{
+  const rows=filteredHist();if(!rows.length)return toast('No hay datos para exportar.',true);
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const csv='\ufeff'+[MOV_HEAD.map(q).join(','),...rows.map(m=>[m.fecha,m.hora,m.producto,m.categoria,m.tipo,m.cantidad,m.unidad,m.lote,m.responsable,m.observaciones,m.stockResultante].map(q).join(','))].join('\n');
+  download(new Blob([csv],{type:'text/csv'}),`movimientos_${today()}.csv`);
+};
+$('#iCsv').onclick=()=>{
+  if(!S.productos.length)return toast('No hay productos para exportar.',true);
+  const h=['ID','Producto','Categoría','Unidad','Stock inicial','Stock actual','Stock mínimo','Estado','Proveedor','Notas','Creado'];
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const csv='\ufeff'+[h.map(q).join(','),...S.productos.map(p=>[p.id,p.nombre,p.categoria,p.unidad,p.stockInicial,p.stockActual,p.stockMin,ESTL[estado(p)],p.proveedor,p.notas,p.creado].map(q).join(','))].join('\n');
+  download(new Blob([csv],{type:'text/csv'}),`inventario_${today()}.csv`);
+};
+$('#fCat').onsubmit=async e=>{
+  e.preventDefault();
+  const ok=await act({action:'addCategory',nombre:$('#cNom').value.trim()},'Categoría creada ✔ (con su hoja en Google Sheets)');
+  if(ok)$('#cNom').value='';
+};
+$('#pCat').onchange=()=>$('#pNewWrap').classList.toggle('hide',$('#pCat').value!=='__new__');
+$('#fProd').onsubmit=async e=>{
+  e.preventDefault();let cat=$('#pCat').value;
+  if(cat==='__new__'){cat=$('#pNew').value.trim();if(!cat)return toast('Escribe el nombre de la nueva categoría.',true)}
+  const ok=await act({action:'addProduct',nombre:$('#pNom').value.trim(),categoria:cat,unidad:$('#pUni').value,stockInicial:parseFloat($('#pStock').value)||0,stockMin:parseFloat($('#pMin').value)||0,proveedor:$('#pProv').value.trim(),notas:$('#pNotas').value.trim()},'Producto guardado ✔',$('#pBtn'));
+  if(ok){$('#fProd').reset();$('#pNewWrap').classList.add('hide')}
+};
+$('#btnSync').onclick=async()=>{await load();toast('Datos actualizados')};
+$('#btnCfg').onclick=()=>{
+  if(API_OK)return toast('Conectado a Google Sheets (la URL está fija en el index.html).');
+  $('#cfgUrl').value=URL_;$('#dlgCfg').showModal();
+};
+$('#cfgClose').onclick=()=>$('#dlgCfg').close();
+$('#cfgSave').onclick=async()=>{
+  URL_=$('#cfgUrl').value.trim();
+  if(URL_&&!/^https:\/\/script\.google\.com\/.+\/exec/.test(URL_))return toast('La URL debe terminar en /exec (Apps Script).',true);
+  URL_?localStorage.setItem(LS_URL,URL_):localStorage.removeItem(LS_URL);
+  $('#dlgCfg').close();await load();toast(URL_?'Conectado a Google Sheets':'Modo demo activado');
+};
+$('#cfgDemo').onclick=async()=>{
+  if(URL_)return toast('Quita la URL para usar el modo demo.',true);
+  const d=local.get();if(d.productos.length&&!confirm('Esto reemplaza los datos demo actuales. ¿Continuar?'))return;
+  const P=(n,c,u,s,m)=>({nombre:n,categoria:c,unidad:u,stock:s,min:m});
+  const demo=[P('Urea 46%','Fertilizantes','kg',500,100),P('Nitrato de calcio','Fertilizantes','kg',300,80),P('Cipermetrina','Pesticidas','L',20,5),P('Mancozeb','Fungicidas','kg',40,10),P('Ácido húmico','Enmiendas','L',60,15),P('Algas marinas','Foliares','L',25,8),P('Enraizante AIB','Enraizantes','L',12,4)];
+  const n={productos:[],movimientos:[],categorias:CATS0.slice()};local.save(n);
+  demo.forEach(x=>local.post({action:'addProduct',nombre:x.nombre,categoria:x.categoria,unidad:x.unidad,stockInicial:x.stock,stockMin:x.min}));
+  const dd=local.get();
+  for(let i=0;i<14;i++){const f=new Date();f.setDate(f.getDate()-i*2);
+    const p=dd.productos[i%dd.productos.length];
+    local.post({action:'addMovement',idProducto:p.id,tipo:'Salida',cantidad:r3((p.stockInicial*0.04)*(1+(i%3)*.5)),fecha:ymd(f),lote:'Lote '+(1+i%4),responsable:i%2?'Juan':'María'});}
+  $('#dlgCfg').close();await load();toast('Datos de ejemplo cargados');
+};
+
+/* ===== Inicio ===== */
+$('#rFecha').value=today();
+load();
+
+/* ===== PWA: registrar service worker ===== */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})});
+}
+</script>
+</body>
+</html>
