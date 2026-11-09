@@ -80,12 +80,27 @@ tr:last-child td{border-bottom:0}
 .empty{text-align:center;color:var(--mut);padding:26px 10px}
 .mut{color:var(--mut);font-size:13px}
 .hide{display:none!important}
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;background:#16221a;color:#fff;padding:12px 18px;border-radius:12px;z-index:60;max-width:90vw;box-shadow:var(--sh);opacity:0;pointer-events:none;transition:opacity .25s}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;background:#16221a;color:#fff;padding:12px 18px;border-radius:12px;z-index:200;max-width:90vw;box-shadow:var(--sh);opacity:0;pointer-events:none;transition:opacity .25s}
 #toast.show{opacity:1}#toast.err{background:var(--bad)}
 dialog{border:0;border-radius:var(--r);padding:20px;width:min(520px,94vw);box-shadow:0 10px 40px rgba(0,0,0,.3)}
 dialog::backdrop{background:rgba(0,0,0,.45)}
 dialog ol{padding-left:20px;margin:10px 0;font-size:13px;color:var(--mut)}
 .row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+/* ===== Inicio de sesión ===== */
+.auth{position:fixed;inset:0;z-index:100;background:linear-gradient(135deg,var(--g900),var(--g700));display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+.abox{background:#fff;border-radius:18px;padding:26px 22px;width:min(400px,100%);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.abox .logo{font-size:42px;text-align:center;line-height:1.1}
+.abox h1{text-align:center;font-size:22px;color:var(--g900)}
+.abox .sub{text-align:center;margin:2px 0 16px}
+.atabs{display:flex;gap:6px;background:var(--g50);padding:4px;border-radius:12px;margin-bottom:14px}
+.atabs button{flex:1;border:0;background:none;padding:10px;border-radius:9px;font:inherit;font-weight:600;color:var(--mut);cursor:pointer}
+.atabs button.on{background:var(--g700);color:#fff}
+#fAuth{display:grid;gap:12px}
+.chk{display:flex!important;gap:8px;align-items:center;font-weight:400!important}
+.chk input{width:auto;margin:0}
+@media(max-width:520px){#who{display:none}}
+
 @media(min-width:760px){
   body{padding-bottom:0}
   nav{position:static;border:0;background:#fff;box-shadow:var(--sh);justify-content:center;padding:0}
@@ -100,11 +115,37 @@ dialog ol{padding-left:20px;margin:10px 0;font-size:13px;color:var(--mut)}
 </style>
 </head>
 <body>
+
+<!-- INICIO DE SESIÓN / CREAR CUENTA -->
+<div id="auth" class="auth hide">
+  <div class="abox">
+    <div class="logo">🌱</div>
+    <h1>AgroStock</h1>
+    <p class="mut sub">Inventario de insumos agrícolas</p>
+    <div class="atabs" id="aTabs">
+      <button type="button" class="on" data-m="login">Ingresar</button>
+      <button type="button" data-m="reg">Crear cuenta</button>
+    </div>
+    <form id="fAuth" autocomplete="on">
+      <label id="aNomW" class="hide">Nombre completo<input id="aNom" autocomplete="name" placeholder="Ej. Juan Pérez"></label>
+      <label>Usuario<input id="aUser" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Ej. jperez" required></label>
+      <label>Clave<input id="aPass" type="password" autocomplete="current-password" required></label>
+      <label id="aPass2W" class="hide">Repetir clave<input id="aPass2" type="password" autocomplete="new-password"></label>
+      <label id="aCodW" class="hide">Código de registro<input id="aCod" autocomplete="off" placeholder="Te lo da el administrador"></label>
+      <label class="chk"><input type="checkbox" id="aShow"> Mostrar clave</label>
+      <p class="mut" id="aHint"></p>
+      <button class="btn" id="aBtn" style="width:100%">Ingresar</button>
+    </form>
+  </div>
+</div>
+
 <header>
   <h1>🌱 AgroStock<small>Inventario de insumos agrícolas</small></h1>
+  <span class="pill" id="who"></span>
   <span class="pill" id="status">…</span>
   <button class="ibtn" id="btnSync" title="Sincronizar">⟳</button>
   <button class="ibtn" id="btnCfg" title="Configuración">⚙</button>
+  <button class="ibtn" id="btnOut" title="Cerrar sesión">⏻</button>
 </header>
 
 <nav id="nav">
@@ -237,7 +278,7 @@ dialog ol{padding-left:20px;margin:10px 0;font-size:13px;color:var(--mut)}
     <li>Implementar › Aplicación web › acceso: <b>Cualquier persona</b>.</li>
     <li>Pega aquí la URL y guarda.</li>
   </ol>
-  <p class="mut">Sin URL, la app funciona en <b>modo demo</b>: los datos se guardan solo en este navegador.</p>
+  <p class="mut">Sin URL, la app funciona en <b>modo demo</b>: los datos y las cuentas se guardan solo en este navegador.</p>
   <div class="row">
     <button class="btn" id="cfgSave">Guardar</button>
     <button class="btn sec" id="cfgDemo">Cargar datos de ejemplo (demo)</button>
@@ -250,7 +291,7 @@ dialog ol{padding-left:20px;margin:10px 0;font-size:13px;color:var(--mut)}
 /* ============================================================
    CONFIGURACIÓN: URL de tu Apps Script (termina en /exec)
    ============================================================ */
-const API_URL='https://script.google.com/macros/s/AKfycbw5c6QcVaqRgK7cENUmZqNNl_U_NlLYcg-6YsDGoVmXQiW4n3nIShX1FuWM7CAw-TqV/exec';
+const API_URL='https://script.google.com/macros/s/AKfycbx1lWJgV-uFfkcTGlG4UAzPV8YL8kZpDbpX3XUStK9Wz_hD1pWpzSX76FPxyAYFgekdQA/exec';
 
 /* ===== Utilidades ===== */
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
@@ -269,12 +310,55 @@ let toastT;
 function toast(msg,err){const t=$('#toast');t.textContent=msg;t.className='show'+(err?' err':'');clearTimeout(toastT);toastT=setTimeout(()=>t.className='',3600)}
 
 /* ===== Datos / backend ===== */
-const LS_DATA='agrostock_local',LS_URL='agrostock_url';
+const LS_DATA='agrostock_local',LS_URL='agrostock_url',LS_SES='agrostock_sess',LS_USERS='agrostock_users';
 const CATS0=['Fertilizantes','Pesticidas','Fungicidas','Enmiendas','Foliares','Enraizantes','Otros'];
-const RESERV=['productos','movimientos','categorias'];
+const RESERV=['productos','movimientos','categorias','usuarios'];
 let S={productos:[],movimientos:[],categorias:[]};
 const API_OK=/^https:\/\/script\.google\.com\/.+\/exec/.test(API_URL);
 let URL_=API_OK?API_URL:(localStorage.getItem(LS_URL)||'');
+
+/* ===== Sesión ===== */
+let SES=null;try{SES=JSON.parse(localStorage.getItem(LS_SES))}catch(e){}
+function setSes(d){
+  SES=d?{token:d.token,usuario:d.usuario}:null;
+  try{SES?localStorage.setItem(LS_SES,JSON.stringify(SES)):localStorage.removeItem(LS_SES)}catch(e){}
+}
+const normU=s=>String(s||'').trim().toLowerCase();
+async function sha(s){
+  try{if(window.crypto&&crypto.subtle){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}}catch(e){}
+  let h=5381;for(const c of s)h=((h<<5)+h+c.charCodeAt(0))|0;return 'f'+h;
+}
+
+/* Cuentas en modo demo (solo en este navegador) */
+const localAuth={
+  users(){try{return JSON.parse(localStorage.getItem(LS_USERS))||[]}catch(e){return[]}},
+  save(u){try{localStorage.setItem(LS_USERS,JSON.stringify(u))}catch(e){}},
+  async register(b){
+    const u=normU(b.usuario),n=String(b.nombre||'').trim(),c=String(b.clave||''),all=this.users();
+    if(!/^[a-z0-9._-]{3,30}$/.test(u))throw new Error('Usuario: de 3 a 30 caracteres (letras, números, punto o guion).');
+    if(!n)throw new Error('Escribe tu nombre.');
+    if(c.length<6)throw new Error('La clave debe tener al menos 6 caracteres.');
+    if(all.some(x=>x.usuario===u))throw new Error('Ese usuario ya existe.');
+    all.push({usuario:u,nombre:n,rol:all.length?'Usuario':'Administrador',hash:await sha(u+'|'+c),creado:today()});
+    this.save(all);return this.login({usuario:u,clave:c});
+  },
+  async login(b){
+    const u=normU(b.usuario),f=this.users().find(x=>x.usuario===u);
+    if(!f||f.hash!==await sha(u+'|'+String(b.clave||'')))throw new Error('Usuario o clave incorrectos.');
+    return {token:'local',usuario:{usuario:f.usuario,nombre:f.nombre,rol:f.rol}};
+  }
+};
+
+async function authCall(body){
+  if(!URL_)return localAuth[body.action](body);
+  const r=await fetch(URL_,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)});
+  const j=await r.json();if(!j.ok)throw new Error(j.error);return j.data;
+}
+async function authStatus(){
+  if(!URL_)return {hayUsuarios:localAuth.users().length>0};
+  const r=await fetch(URL_+'?action=status');const j=await r.json();
+  if(!j.ok)throw new Error(j.error);return j.data;
+}
 
 const local={
   get(){let d=null;try{d=JSON.parse(localStorage.getItem(LS_DATA))}catch(e){}
@@ -318,26 +402,82 @@ const local={
     this.save(d);return d;
   }
 };
+function authErr(j){const e=new Error(j.error);e.auth=true;return e}
 async function apiGet(){
   if(!URL_)return local.get();
-  const r=await fetch(URL_+'?action=getAll');const j=await r.json();
-  if(!j.ok)throw new Error(j.error);return j.data;
+  const r=await fetch(URL_+'?action=getAll&token='+encodeURIComponent(SES?SES.token:''));const j=await r.json();
+  if(!j.ok){if(j.auth===false)throw authErr(j);throw new Error(j.error)}return j.data;
 }
 async function apiPost(body){
   if(!URL_)return local.post(body);
-  const r=await fetch(URL_,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)});
-  const j=await r.json();if(!j.ok)throw new Error(j.error);return j.data;
+  const r=await fetch(URL_,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...body,token:SES?SES.token:''})});
+  const j=await r.json();if(!j.ok){if(j.auth===false)throw authErr(j);throw new Error(j.error)}return j.data;
 }
 async function load(){
-  try{S=await apiGet();render()}catch(e){toast('No se pudo leer Google Sheets: '+e.message,true)}
+  try{S=await apiGet();render()}
+  catch(e){if(e.auth){logout(true,e.message);return}toast('No se pudo leer Google Sheets: '+e.message,true)}
   const st=$('#status');st.textContent=URL_?'● Google Sheets':'Modo demo (local)';st.className='pill'+(URL_?'':' demo');
 }
 async function act(body,okMsg,btn){
   if(btn)btn.disabled=true;
   try{S=await apiPost(body);render();if(okMsg)toast(typeof okMsg==='function'?okMsg():okMsg);return true}
-  catch(e){toast(e.message,true);return false}
+  catch(e){if(e.auth){logout(true,e.message);return false}toast(e.message,true);return false}
   finally{if(btn)btn.disabled=false}
 }
+
+/* ===== Pantalla de acceso ===== */
+let amode='login',HAY=true;
+function setAuthMode(m){
+  amode=m;const reg=m==='reg';
+  $$('#aTabs button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  $('#aNomW').classList.toggle('hide',!reg);
+  $('#aPass2W').classList.toggle('hide',!reg);
+  $('#aCodW').classList.toggle('hide',!(reg&&HAY&&!!URL_));
+  $('#aPass').autocomplete=reg?'new-password':'current-password';
+  $('#aBtn').textContent=reg?'Crear cuenta':'Ingresar';
+  $('#aHint').textContent=reg
+    ?(HAY?(URL_?'Pide el código de registro al administrador.':'Modo demo: la cuenta se guarda solo en este navegador.'):'Aún no hay cuentas: la primera que crees será Administrador.')
+    :(HAY?'':'Aún no hay cuentas. Crea la primera en “Crear cuenta”.');
+}
+async function showAuth(msg){
+  $('#auth').classList.remove('hide');document.body.style.overflow='hidden';
+  try{HAY=(await authStatus()).hayUsuarios}catch(e){HAY=true}
+  setAuthMode(HAY?'login':'reg');
+  if(msg)toast(msg,true);
+}
+function hideAuth(){$('#auth').classList.add('hide');document.body.style.overflow=''}
+async function startApp(){
+  $('#who').textContent='👤 '+(SES&&SES.usuario?SES.usuario.nombre:'');
+  await load();
+}
+async function logout(silent,msg){
+  if(SES&&URL_&&SES.token&&!silent){
+    fetch(URL_,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'logout',token:SES.token})}).catch(()=>{});
+  }
+  setSes(null);S={productos:[],movimientos:[],categorias:[]};
+  showAuth(msg);
+}
+$('#aTabs').onclick=e=>{const b=e.target.closest('button');if(b)setAuthMode(b.dataset.m)};
+$('#aShow').onchange=e=>{const t=e.target.checked?'text':'password';$('#aPass').type=t;$('#aPass2').type=t};
+$('#fAuth').onsubmit=async e=>{
+  e.preventDefault();
+  const u=normU($('#aUser').value),p=$('#aPass').value,btn=$('#aBtn');
+  btn.disabled=true;
+  try{
+    let d;
+    if(amode==='reg'){
+      if(p.length<6)throw new Error('La clave debe tener al menos 6 caracteres.');
+      if(p!==$('#aPass2').value)throw new Error('Las claves no coinciden.');
+      d=await authCall({action:'register',usuario:u,nombre:$('#aNom').value.trim(),clave:p,codigo:$('#aCod').value.trim()});
+    }else{
+      d=await authCall({action:'login',usuario:u,clave:p});
+    }
+    setSes(d);$('#fAuth').reset();$('#aShow').checked=false;$('#aPass').type='password';$('#aPass2').type='password';
+    hideAuth();await startApp();
+  }catch(err){toast(err.message,true)}
+  finally{btn.disabled=false}
+};
+$('#btnOut').onclick=()=>{if(confirm('¿Cerrar sesión?'))logout(false)};
 
 /* ===== Helpers de UI ===== */
 function setOpts(sel,opts,keep=true){
@@ -446,7 +586,7 @@ function preview(){
   box.className='full preview';box.innerHTML=`Stock actual: <b>${fmt(p.stockActual)} ${p.unidad}</b> → quedará: <b>${fmt(nv)} ${p.unidad}</b>`;
 }
 function setTipo(t){
-  tipo=t;$$('.seg button').forEach(b=>b.classList.toggle('on',b.dataset.tipo===t));
+  tipo=t;$$('#fMov .seg button').forEach(b=>b.classList.toggle('on',b.dataset.tipo===t));
   $$('.fSal').forEach(e=>e.classList.toggle('hide',t==='Entrada'));
   $('#rBtn').textContent=t==='Salida'?'Registrar salida':'Registrar entrada';preview();
 }
@@ -518,7 +658,7 @@ $('#invTable').onclick=async e=>{
   if(m){const p=S.productos.find(x=>x.id===m.dataset.min);const v=prompt(`Stock mínimo de ${p.nombre} (${p.unidad}):`,p.stockMin);
     if(v!==null&&v.trim()!==''&&!isNaN(v))await act({action:'updateProduct',id:p.id,stockMin:parseFloat(v)},'Stock mínimo actualizado')}
 };
-$('.seg').onclick=e=>{const b=e.target.closest('button');if(b)setTipo(b.dataset.tipo)};
+$('#fMov .seg').onclick=e=>{const b=e.target.closest('button');if(b)setTipo(b.dataset.tipo)};
 $('#rCat').onchange=()=>{setOpts($('#rProd'),prodOpts($('#rCat').value,false,true),false);preview()};
 $('#rProd').onchange=preview;$('#rCant').oninput=preview;
 $('#fMov').onsubmit=async e=>{
@@ -588,7 +728,7 @@ $('#cfgDemo').onclick=async()=>{
 
 /* ===== Inicio ===== */
 $('#rFecha').value=today();
-load();
+if(SES&&SES.token)startApp();else showAuth();
 
 /* ===== PWA: registrar service worker ===== */
 if('serviceWorker' in navigator){
